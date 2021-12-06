@@ -14,20 +14,39 @@ contract TombVanillaCompounder is Ownable {
 	using SafeERC20 for IERC20;
 
 	// Tokens
-	IERC20 tomb = IERC20(0x6c021Ae822BEa943b2E66552bDe1D2696a53fbB7);
-	IERC20 tshare = IERC20(0x4cdF39285D7Ca8eB3f090fDA0C069ba5F4145B37);
-	IUniswapV2Pair spookyTombFtmLP = IUniswapV2Pair(0x2A651563C9d3Af67aE0388a5c8F89b867038089e);
+	IERC20 tomb;
+	IERC20 tshare;
+	IUniswapV2Pair spookyTombFtmLP;
 
 	// Tomb's smart contracts
-	IMasonry masonry = IMasonry(0x8764DE60236C5843D9faEB1B638fbCE962773B67);
-	ITShareRewardPool cemetery = ITShareRewardPool(0xcc0a87F7e7c693042a9Cc703661F5060c80ACb43);
+	IMasonry masonry;
+	ITShareRewardPool cemetery;
 
 	// SpookySwap's smart contracts
-	IUniswapV2Router02 spookyRouter = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
+	IUniswapV2Router02 spookyRouter;
 
 	// Slippage for interactions with SpookySwap
 	// 1 means 0.1%, 10 means 1%, and so on...
 	uint256 slippageInTenthOfPercent = 10;
+
+	constructor(
+		address _tomb,
+		address _tshare,
+		address _spookyTombFtmLP,
+		address _masonry,
+		address _cemetery,
+		address _spookyRouter
+	) {
+		tomb = IERC20(_tomb);
+		tshare = IERC20(_tshare);
+		spookyTombFtmLP = IUniswapV2Pair(_spookyTombFtmLP);
+		masonry = IMasonry(_masonry);
+		cemetery = ITShareRewardPool(_cemetery);
+		spookyRouter = IUniswapV2Router02(_spookyRouter);
+	}
+
+	// Fallback payable function
+	receive() external payable {}
 
 	// Getters for balances at Tomb against this contract's address
 	function getTSHAREBalanceAtTombMasonry() public view returns (uint256) {
@@ -46,7 +65,7 @@ contract TombVanillaCompounder is Ownable {
 	}
 
 	function withdrawDustTOMB() external onlyOwner {
-		require(tomb.balanceOf(address(this)) > 0, "No dust TOMB to withdraw");
+		require(tomb.balanceOf(address(this)) > 0, "No dust TOMB to withdraw!");
 		tomb.safeTransfer(msg.sender, tomb.balanceOf(address(this)));
 	}
 
