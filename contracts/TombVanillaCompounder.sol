@@ -14,16 +14,16 @@ contract TombVanillaCompounder is Ownable {
 	using SafeERC20 for IERC20;
 
 	// Tokens
-	IERC20 tomb;
-	IERC20 tshare;
-	IUniswapV2Pair spookyTombFtmLP;
+	IERC20 public tomb;
+	IERC20 public tshare;
+	IUniswapV2Pair public spookyTombFtmLP;
 
 	// Tomb's smart contracts
-	IMasonry masonry;
-	ITShareRewardPool cemetery;
+	IMasonry public masonry;
+	ITShareRewardPool public cemetery;
 
 	// SpookySwap's smart contracts
-	IUniswapV2Router02 spookyRouter;
+	IUniswapV2Router02 public spookyRouter;
 
 	// Slippage for interactions with SpookySwap
 	// 1 means 0.1%, 10 means 1%, and so on...

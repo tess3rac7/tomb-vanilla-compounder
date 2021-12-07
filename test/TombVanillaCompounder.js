@@ -79,6 +79,7 @@ describe("TombVanillaCompounder", () => {
       await expect(contract.withdrawDustTOMB()).to.be.revertedWith("No dust TOMB to withdraw!");
 
       // Running into issues here due to SafeERC20
+      // Probably need to create live instances of tokens instead of mocking them
       // await mockTomb.mock.balanceOf.withArgs(contract.address).returns(200);
       // await mockTomb.mock.transfer().returns();
       // await contract.withdrawDustTOMB();
