@@ -21,16 +21,12 @@ exports.handler = async function() {
 		const tx = await contract.runRoutine();
 
 		const successMessage = `:white_check_mark: Transaction sent https://ftmscan.com/tx/${tx.hash}`;
-		await postToDiscord(successMessage);
+		await hook.send(successMessage);
 	} catch (err) {
 		const errorMessage = `:warning: Transaction failed: ${err.message}`;
-		await postToDiscord(errorMessage);
+		await hook.send(errorMessage);
 		return err;
 	}
 
 	return true;
-}
-
-function postToDiscord(text) {
-	hook.send(text);
 }
