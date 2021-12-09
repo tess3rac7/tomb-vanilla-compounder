@@ -6,151 +6,137 @@ import "./interfaces/IMasonry.sol";
 import "./interfaces/ITShareRewardPool.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Router02.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract TombVanillaCompounder is Ownable {
-	using SafeERC20 for IERC20;
+contract TombVanillaCompounder is AccessControl {
+    using SafeERC20 for IERC20;
 
-	// Tokens
-	IERC20 public tomb;
-	IERC20 public tshare;
-	IUniswapV2Pair public spookyTombFtmLP;
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
-	// Tomb's smart contracts
-	IMasonry public masonry;
-	ITShareRewardPool public cemetery;
+    // Tokens
+    IERC20 public tomb;
+    IERC20 public tshare;
+    IUniswapV2Pair public spookyTombFtmLP;
 
-	// SpookySwap's smart contracts
-	IUniswapV2Router02 public spookyRouter;
+    // Tomb's smart contracts
+    IMasonry public masonry;
+    ITShareRewardPool public cemetery;
 
-	// Slippage for interactions with SpookySwap
-	// 1 means 0.1%, 10 means 1%, and so on...
-	uint256 slippageInTenthOfPercent = 10;
+    // SpookySwap's smart contracts
+    IUniswapV2Router02 public spookyRouter;
 
-	constructor(
-		address _tomb,
-		address _tshare,
-		address _spookyTombFtmLP,
-		address _masonry,
-		address _cemetery,
-		address _spookyRouter
-	) {
-		tomb = IERC20(_tomb);
-		tshare = IERC20(_tshare);
-		spookyTombFtmLP = IUniswapV2Pair(_spookyTombFtmLP);
-		masonry = IMasonry(_masonry);
-		cemetery = ITShareRewardPool(_cemetery);
-		spookyRouter = IUniswapV2Router02(_spookyRouter);
-	}
+    // Slippage for interactions with SpookySwap
+    // 1 means 0.1%, 10 means 1%, and so on...
+    uint256 slippageInTenthOfPercent = 10;
 
-	// Fallback payable function
-	receive() external payable {}
+    constructor(
+        address _tomb,
+        address _tshare,
+        address _spookyTombFtmLP,
+        address _masonry,
+        address _cemetery,
+        address _spookyRouter,
+        address _operator
+    ) {
+        tomb = IERC20(_tomb);
+        tshare = IERC20(_tshare);
+        spookyTombFtmLP = IUniswapV2Pair(_spookyTombFtmLP);
+        masonry = IMasonry(_masonry);
+        cemetery = ITShareRewardPool(_cemetery);
+        spookyRouter = IUniswapV2Router02(_spookyRouter);
 
-	// Getters for balances at Tomb against this contract's address
-	function getTSHAREBalanceAtTombMasonry() public view returns (uint256) {
-		return masonry.balanceOf(address(this));
-	}
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-	function getLPBalanceAtTombCemetery() public view returns (uint256) {
-		(uint256 amount, ) = cemetery.userInfo(0, address(this));
-		return amount;
-	}
+        _grantRole(OPERATOR_ROLE, msg.sender);
+        _grantRole(OPERATOR_ROLE, _operator);
+    }
 
-	// Functions to withdraw tokens only from this contract
-	function withdrawDustFTM() external onlyOwner {
-		require(address(this).balance > 0, "No dust FTM to withdraw!");
-		payable(msg.sender).transfer(address(this).balance);
-	}
+    // Fallback payable function
+    receive() external payable {}
 
-	function withdrawDustTOMB() external onlyOwner {
-		require(tomb.balanceOf(address(this)) > 0, "No dust TOMB to withdraw!");
-		tomb.safeTransfer(msg.sender, tomb.balanceOf(address(this)));
-	}
+    // Getters for balances at Tomb against this contract's address
+    function getTSHAREBalanceAtTombMasonry() public view returns (uint256) {
+        return masonry.balanceOf(address(this));
+    }
 
-	// Functions to withdraw tokens both from this contract and from Tomb
-	function withdrawTSHARE() external onlyOwner returns (string memory) {
-		string memory masonryStatus;
-		if (getTSHAREBalanceAtTombMasonry() > 0) {
-			if (masonry.canWithdraw(address(this))) {
-				masonry.withdraw(masonry.balanceOf(address(this)));	
-			} else {
-				masonryStatus = "Masonry has balance but cannot withdraw just yet. Try again later.";	
-			}
-			
-		} else {
-			masonryStatus = "No TSHAREs left in Masonry.";
-		}
-		tshare.safeTransfer(msg.sender, tshare.balanceOf(address(this)));
-		return masonryStatus;
-	}
+    function getLPBalanceAtTombCemetery() public view returns (uint256) {
+        (uint256 amount, ) = cemetery.userInfo(0, address(this));
+        return amount;
+    }
 
-	function withdrawLP() external onlyOwner {
-		cemetery.withdraw(0, getLPBalanceAtTombCemetery());
-		spookyTombFtmLP.transfer(msg.sender, spookyTombFtmLP.balanceOf(address(this)));
-	}
+    // Functions to withdraw tokens only from this contract
+    function withdrawDustFTM() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(address(this).balance > 0, "No dust FTM to withdraw!");
+        payable(msg.sender).transfer(address(this).balance);
+    }
 
-	function setSlippage(uint256 _slippageInTenthOfPercent) external onlyOwner {
-		slippageInTenthOfPercent = _slippageInTenthOfPercent;
-	}
+    function withdrawDustTOMB() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(tomb.balanceOf(address(this)) > 0, "No dust TOMB to withdraw!");
+        tomb.safeTransfer(msg.sender, tomb.balanceOf(address(this)));
+    }
 
-	function _claimAnyTSHARERewardsFromCemetery() internal {
-		// calling withdraw with amount as 0 simply claims any pending TSHAREs
-		cemetery.withdraw(0, 0);
-	}
+    function setSlippage(uint256 _slippageInTenthOfPercent) external onlyRole(OPERATOR_ROLE) {
+        slippageInTenthOfPercent = _slippageInTenthOfPercent;
+    }
 
-	function _claimAnyTOMBRewardsFromMasonryIfAllowed() internal {
-		if (masonry.earned(address(this)) > 0 && masonry.canClaimReward(address(this))) {
-			masonry.claimReward();
-		}
-	}
+    function _claimAnyTSHARERewardsFromCemetery() internal {
+        // calling withdraw with amount as 0 simply claims any pending TSHAREs
+        cemetery.withdraw(0, 0);
+    }
 
-	function _depositAnyTSHAREIntoMasonry() internal {
-		uint256 contractTSHAREBalance = tshare.balanceOf(address(this));
-		if (contractTSHAREBalance > 0) {
-			tshare.safeIncreaseAllowance(address(masonry), contractTSHAREBalance);
-			masonry.stake(contractTSHAREBalance);
-		}
-	}
+    function _claimAnyTOMBRewardsFromMasonryIfAllowed() internal {
+        if (masonry.earned(address(this)) > 0 && masonry.canClaimReward(address(this))) {
+            masonry.claimReward();
+        }
+    }
 
-	function _swapHalfTOMBForFTM() internal {
-		uint256 contractTOMBBalance = tomb.balanceOf(address(this));
-		if (contractTOMBBalance > 0) {
-			uint256 halfTOMB = contractTOMBBalance / 2;
-			tomb.approve(address(spookyRouter), halfTOMB);
+    function _depositAnyTSHAREIntoMasonry() internal {
+        uint256 contractTSHAREBalance = tshare.balanceOf(address(this));
+        if (contractTSHAREBalance > 0) {
+            tshare.safeIncreaseAllowance(address(masonry), contractTSHAREBalance);
+            masonry.stake(contractTSHAREBalance);
+        }
+    }
 
-			address[] memory path = new address[](2);
-			path[0] = address(tomb);
-			path[1] = spookyRouter.WETH();
+    function _swapHalfTOMBForFTM() internal {
+        uint256 contractTOMBBalance = tomb.balanceOf(address(this));
+        if (contractTOMBBalance > 0) {
+            uint256 halfTOMB = contractTOMBBalance / 2;
+            tomb.approve(address(spookyRouter), halfTOMB);
 
-			uint[] memory amountOutMins = spookyRouter.getAmountsOut(halfTOMB, path);
-			uint256 minFTMExpected = amountOutMins[1] - ((slippageInTenthOfPercent * amountOutMins[1]) / 1000);
+            address[] memory path = new address[](2);
+            path[0] = address(tomb);
+            path[1] = spookyRouter.WETH();
 
-			spookyRouter.swapExactTokensForETH(halfTOMB, minFTMExpected, path, address(this), block.timestamp);
-		}
-	}
+            uint[] memory amountOutMins = spookyRouter.getAmountsOut(halfTOMB, path);
+            uint256 minFTMExpected = amountOutMins[1] - ((slippageInTenthOfPercent * amountOutMins[1]) / 1000);
 
-	function _addFTMTOMBLiquidity() internal {
-		uint256 contractTOMBBalance = tomb.balanceOf(address(this));
-		uint256 contractFTMBalance = address(this).balance;
+            spookyRouter.swapExactTokensForETH(halfTOMB, minFTMExpected, path, address(this), block.timestamp);
+        }
+    }
 
-		if (contractTOMBBalance > 0 && contractFTMBalance > 0) {
-			tomb.approve(address(spookyRouter), contractTOMBBalance);
+    function _addFTMTOMBLiquidity() internal {
+        uint256 contractTOMBBalance = tomb.balanceOf(address(this));
+        uint256 contractFTMBalance = address(this).balance;
 
-			uint256 minTOMB = contractTOMBBalance - ((slippageInTenthOfPercent * contractTOMBBalance) / 1000);
-			uint256 minFTM = contractFTMBalance - ((slippageInTenthOfPercent * contractFTMBalance) / 1000);
+        if (contractTOMBBalance > 0 && contractFTMBalance > 0) {
+            tomb.approve(address(spookyRouter), contractTOMBBalance);
 
-			spookyRouter.addLiquidityETH{value: contractFTMBalance}(
-				address(tomb), contractTOMBBalance, minTOMB, minFTM, address(this), block.timestamp);
-		}
-	}
+            uint256 minTOMB = contractTOMBBalance - ((slippageInTenthOfPercent * contractTOMBBalance) / 1000);
+            uint256 minFTM = contractFTMBalance - ((slippageInTenthOfPercent * contractFTMBalance) / 1000);
 
-	function _depositAnyLPIntoCemetery() internal {
-		uint256 contractLPBalance = spookyTombFtmLP.balanceOf(address(this));
-		if (contractLPBalance > 0) {
-			spookyTombFtmLP.approve(address(cemetery), contractLPBalance);
-			cemetery.deposit(0, contractLPBalance);
-		}
-	}
+            spookyRouter.addLiquidityETH{value: contractFTMBalance}(
+                address(tomb), contractTOMBBalance, minTOMB, minFTM, address(this), block.timestamp);
+        }
+    }
+
+    function _depositAnyLPIntoCemetery() internal {
+        uint256 contractLPBalance = spookyTombFtmLP.balanceOf(address(this));
+        if (contractLPBalance > 0) {
+            spookyTombFtmLP.approve(address(cemetery), contractLPBalance);
+            cemetery.deposit(0, contractLPBalance);
+        }
+    }
 }
