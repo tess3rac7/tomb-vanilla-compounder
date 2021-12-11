@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "./TombVanillaCompounder.sol";
 
 contract TombMultiCrypt is TombVanillaCompounder {
+    using SafeERC20 for IERC20;
 
     struct Deposit {
         uint256 amount;
@@ -76,7 +77,7 @@ contract TombMultiCrypt is TombVanillaCompounder {
         return balance;
     }
 
-    function getWithdrawableLPBalance(address _user) external view returns (uint256) {
+    function getWithdrawableLPBalance(address _user) public view returns (uint256) {
         if (_isCurrentPhaseOpen()) return getLPBalance(_user);
 
         // if current phase is closed only deposits made in the current phase can be withdrawn
@@ -114,7 +115,7 @@ contract TombMultiCrypt is TombVanillaCompounder {
         return balance;
     }
 
-    function getWithdrawableTSHAREBalance(address _user) external view returns (uint256) {
+    function getWithdrawableTSHAREBalance(address _user) public view returns (uint256) {
         if (_isCurrentPhaseOpen()) return getTSHAREBalance(_user);
 
         // if current phase is closed only deposists made in the current phase can be withdrawn
@@ -168,19 +169,27 @@ contract TombMultiCrypt is TombVanillaCompounder {
     */
 
     function withdrawLP(uint256 _amount) external {
-        // require withdrawableBalance >= _amount
-        // call settleAccount
-        // require lastElement's amount >= _amount
-        // subtract and transfer
-        // if last element's balance becomes 0, pop
+        require(getWithdrawableLPBalance(msg.sender) >= _amount, "Withdrawable balance exceeded for LP tokens!");
+        _settleLPAccount(msg.sender);
+
+        // at this point, last element in deposits array should have enough to cover this withdrawal
+        Deposit[] storage deposits = LPDepositsForUser[msg.sender];
+        deposits[deposits.length - 1].amount -= _amount;
+        if (deposits[deposits.length - 1].amount == 0) deposits.pop();
+
+        spookyTombFtmLP.transfer(msg.sender, _amount);
     }
 
-    function withdrawTSHARE() external {
-        // require withdrawableBalance >= _amount
-        // call settleAccount
-        // require lastElement's amount >= _amount
-        // subtract and transfer
-        // if last element's balance becomes 0, pop
+    function withdrawTSHARE(uint256 _amount) external {
+        require(getWithdrawableTSHAREBalance(msg.sender) >= _amount, "Withdrawable balance exceeded for TSHAREs!");
+        _settleTSHAREAccount(msg.sender);
+
+        // at this point, last element in deposits array should have enough to cover this withdrawal
+        Deposit[] storage deposits = TSHAREDepositsForUser[msg.sender];
+        deposits[deposits.length - 1].amount -= _amount;
+        if (deposits[deposits.length - 1].amount == 0) deposits.pop();
+
+        tshare.safeTransfer(msg.sender, _amount);
     }
 
     /*
