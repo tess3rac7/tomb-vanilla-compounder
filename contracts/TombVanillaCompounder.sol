@@ -100,6 +100,7 @@ contract TombVanillaCompounder is AccessControl {
         }
     }
 
+    // should probably remove in favor of _swapHalfToken1ForToken2 and refactor usages
     function _swapHalfTOMBForFTM() internal {
         uint256 contractTOMBBalance = tomb.balanceOf(address(this));
         if (contractTOMBBalance > 0) {
@@ -114,6 +115,23 @@ contract TombVanillaCompounder is AccessControl {
             uint256 minFTMExpected = amountOutMins[1] - ((slippageInTenthOfPercent * amountOutMins[1]) / 1000);
 
             spookyRouter.swapExactTokensForETH(halfTOMB, minFTMExpected, path, address(this), block.timestamp);
+        }
+    }
+
+    function _swapHalfToken1ForToken2(IERC20 _token1, IERC20 _token2) internal {
+        uint256 contractToken1Balance = _token1.balanceOf(address(this));
+        if (contractToken1Balance > 0) {
+            uint256 halfToken1 = contractToken1Balance / 2;
+            _token1.approve(address(spookyRouter), halfToken1);
+
+            address[] memory path = new address[](2);
+            path[0] = address(_token1);
+            path[1] = address(_token2);
+
+            uint[] memory amountOutMins = spookyRouter.getAmountsOut(halfToken1, path);
+            uint256 minToken2Expected = amountOutMins[1] - ((slippageInTenthOfPercent * amountOutMins[1]) / 1000);
+
+            spookyRouter.swapExactTokensForTokens(halfToken1, minToken2Expected, path, address(this), block.timestamp);
         }
     }
 
