@@ -132,6 +132,7 @@ contract TombMultiCrypt is TombVanillaCompounder {
 
     /*
     * USER DEPOSIT FUNCTIONS
+    * user must have approved contract for the amounts prior to invoking!
     */
 
     function depositFTM() external payable {
@@ -143,15 +144,23 @@ contract TombMultiCrypt is TombVanillaCompounder {
     }
 
     function depositLP(uint256 _amount) external {
-        // require _amount > 0
-        // push new element
-        // call settleAccount
+        require(_amount > 0, "Cannot deposit 0 LP tokens!");
+        require(spookyTombFtmLP.allowance(msg.sender, address(this)) >= _amount, "Don't have allowance for this amount!");
+        spookyTombFtmLP.transferFrom(msg.sender, address(this), _amount);
+
+        Deposit memory deposit = Deposit(_amount, currentPhaseIndex);
+        LPDepositsForUser[msg.sender].push(deposit);
+        _settleLPAccount(msg.sender);
     }
 
     function depositTSHARE(uint256 _amount) external {
-        // require _amount > 0
-        // push new element
-        // call settleAccount
+        require(_amount > 0, "Cannot deposit 0 TSHAREs!");
+        require(tshare.allowance(msg.sender, address(this)) >= _amount, "Don't have allowance for this amount!");
+        tshare.transferFrom(msg.sender, address(this), _amount);
+
+        Deposit memory deposit = Deposit(_amount, currentPhaseIndex);
+        TSHAREDepositsForUser[msg.sender].push(deposit);
+        _settleTSHAREAccount(msg.sender);
     }
 
     /*
