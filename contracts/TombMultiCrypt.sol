@@ -49,7 +49,7 @@ contract TombMultiCrypt is TombVanillaCompounder {
     * USER BALANCE FUNCTIONS
     */
 
-    function getLPBalance(address _user) external view returns (uint256) {
+    function getLPBalance(address _user) public view returns (uint256) {
         uint256 balance = 0;
 
         // Base LP deposits
@@ -71,7 +71,23 @@ contract TombMultiCrypt is TombVanillaCompounder {
         return balance;
     }
 
-    function getTSHAREBalance(address _user) external view returns (uint256) {
+    function getWithdrawableLPBalance(address _user) external view returns (uint256) {
+        if (_isCurrentPhaseOpen()) return getLPBalance(_user);
+
+        // if current phase is closed only deposits made in the current phase can be withdrawn
+        uint256 withdrawableBalance = 0;
+        Deposit[] storage LPDeposits = LPDepositsForUser[_user];
+        if (LPDeposits.length > 0) {
+            Deposit storage lastDeposit = LPDeposits[LPDeposits.length - 1];
+            if (lastDeposit.phaseIndex == currentPhaseIndex) {
+                withdrawableBalance = lastDeposit.amount;
+            }
+        }
+
+        return withdrawableBalance;
+    }
+
+    function getTSHAREBalance(address _user) public view returns (uint256) {
         uint256 balance = 0;
 
         // Base TSHARE deposits
@@ -91,6 +107,22 @@ contract TombMultiCrypt is TombVanillaCompounder {
         }
 
         return balance;
+    }
+
+    function getWithdrawableTSHAREBalance(address _user) external view returns (uint256) {
+        if (_isCurrentPhaseOpen()) return getTSHAREBalance(_user);
+
+        // if current phase is closed only deposists made in the current phase can be withdrawn
+        uint256 withdrawableBalance = 0;
+        Deposit[] storage TSHAREDeposits = TSHAREDepositsForUser[_user];
+        if (TSHAREDeposits.length > 0) {
+            Deposit storage lastDeposit = TSHAREDeposits[TSHAREDeposits.length - 1];
+            if (lastDeposit.phaseIndex == currentPhaseIndex) {
+                withdrawableBalance = lastDeposit.amount;
+            }
+        }
+
+        return withdrawableBalance;
     }
 
     /*
